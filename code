@@ -1,0 +1,195 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+class Process {
+private:
+    int id, at, bt, pr;
+    int rt, wt, tat, ct;
+    int qlevel;
+    bool done;
+
+public:
+    Process(int _id=0,int _at=0,int _bt=0,int _pr=0){
+        id=_id; at=_at; bt=_bt; pr=_pr;
+        rt=bt; wt=tat=ct=0;
+        qlevel=1; done=false;
+    }
+
+    // Getters
+    int getId() const { return id; }
+    int getAT() const { return at; }
+    int getBT() const { return bt; }
+    int getPR() const { return pr; }
+    int getRT() const { return rt; }
+    int getWT() const { return wt; }
+    int getTAT() const { return tat; }
+    int getCT() const { return ct; }
+    int getQL() const { return qlevel; }
+    bool isDone() const { return done; }
+
+    // Setters
+    void setCT(int t){ ct=t; }
+    void setTAT(){ tat=ct-at; }
+    void setWT(){ wt=tat-bt; }
+    void setRT(int r){ rt=r; }
+    void setQL(int q){ qlevel=q; }
+    void markDone(){ done=true; }
+
+    void reset(){ rt=bt; wt=tat=ct=0; qlevel=1; done=false; }
+
+    void display(bool showPriority=false) const {
+        if(showPriority)
+            cout<<id<<"\t"<<at<<"\t"<<bt<<"\t"<<pr<<"\t"<<ct<<"\t"<<tat<<"\t"<<wt<<"\n";
+        else
+            cout<<id<<"\t"<<at<<"\t"<<bt<<"\t"<<ct<<"\t"<<tat<<"\t"<<wt<<"\n";
+    }
+};
+
+// ================= Scheduling Algorithms =================
+
+// FCFS
+void FCFS(vector<Process> p){
+    sort(p.begin(), p.end(), [](const Process &a, const Process &b){ return a.getAT()<b.getAT(); });
+    int time=0; float avgWT=0, avgTAT=0;
+    for(auto &x:p){
+        if(time<x.getAT()) time=x.getAT();
+        time+=x.getBT();
+        x.setCT(time); x.setTAT(); x.setWT();
+        avgWT+=x.getWT(); avgTAT+=x.getTAT();
+    }
+    cout<<"\nFCFS Scheduling:\nPID\tAT\tBT\tCT\tTAT\tWT\n";
+    for(auto &x:p) x.display();
+    cout<<"Average WT="<<avgWT/p.size()<<", Average TAT="<<avgTAT/p.size()<<"\n";
+}
+
+// SJF (Heap-based)
+void SJF_Heap(vector<Process> p){
+    int n=p.size();
+    sort(p.begin(), p.end(), [](const Process &a, const Process &b){ return a.getAT()<b.getAT(); });
+    priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+    int time=0, i=0, done=0; float avgWT=0, avgTAT=0;
+    while(done<n){
+        while(i<n && p[i].getAT()<=time){ pq.push(make_pair(p[i].getBT(), i)); i++; }
+        if(pq.empty()){ time++; continue; }
+        pair<int,int> top = pq.top(); pq.pop();
+        int idx = top.second;
+        time+=p[idx].getBT();
+        p[idx].setCT(time); p[idx].setTAT(); p[idx].setWT();
+        avgWT+=p[idx].getWT(); avgTAT+=p[idx].getTAT(); done++;
+    }
+    cout<<"\nSJF (Heap-based) Scheduling:\nPID\tAT\tBT\tCT\tTAT\tWT\n";
+    for(auto &x:p) x.display();
+    cout<<"Average WT="<<avgWT/n<<", Average TAT="<<avgTAT/n<<"\n";
+}
+
+// Priority Scheduling (Heap-based)
+void Priority_Heap(vector<Process> p){
+    int n=p.size();
+    sort(p.begin(), p.end(), [](const Process &a, const Process &b){ return a.getAT()<b.getAT(); });
+    priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+    int time=0,i=0,done=0; float avgWT=0, avgTAT=0;
+    while(done<n){
+        while(i<n && p[i].getAT()<=time){ pq.push(make_pair(p[i].getPR(), i)); i++; }
+        if(pq.empty()){ time++; continue; }
+        pair<int,int> top = pq.top(); pq.pop();
+        int idx = top.second;
+        time+=p[idx].getBT();
+        p[idx].setCT(time); p[idx].setTAT(); p[idx].setWT();
+        avgWT+=p[idx].getWT(); avgTAT+=p[idx].getTAT(); done++;
+    }
+    cout<<"\nPriority (Heap-based) Scheduling:\nPID\tAT\tBT\tPR\tCT\tTAT\tWT\n";
+    for(auto &x:p) x.display(true);
+    cout<<"Average WT="<<avgWT/n<<", Average TAT="<<avgTAT/n<<"\n";
+}
+
+// Round Robin
+void RoundRobin(vector<Process> p,int tq){
+    int n=p.size(), time=0, done=0; float avgWT=0, avgTAT=0;
+    for(auto &x:p) x.reset();
+    queue<int> q; vector<bool> inQueue(n,false);
+    while(done<n){
+        for(int i=0;i<n;i++)
+            if(p[i].getAT()<=time && p[i].getRT()>0 && !inQueue[i]){
+                q.push(i); inQueue[i]=true;
+            }
+        if(q.empty()){ time++; continue; }
+        int idx=q.front(); q.pop(); inQueue[idx]=false;
+        int exec=min(tq,p[idx].getRT());
+        time+=exec; p[idx].setRT(p[idx].getRT()-exec);
+        for(int i=0;i<n;i++)
+            if(p[i].getAT()<=time && p[i].getRT()>0 && !inQueue[i]){
+                q.push(i); inQueue[i]=true;
+            }
+        if(p[idx].getRT()>0){ q.push(idx); inQueue[idx]=true; }
+        else{
+            p[idx].setCT(time); p[idx].setTAT(); p[idx].setWT();
+            avgWT+=p[idx].getWT(); avgTAT+=p[idx].getTAT(); done++;
+        }
+    }
+    cout<<"\nRound Robin Scheduling:\nPID\tAT\tBT\tCT\tTAT\tWT\n";
+    for(auto &x:p) x.display();
+    cout<<"Average WT="<<avgWT/n<<", Average TAT="<<avgTAT/n<<"\n";
+}
+
+// MLFQ (Q1=RR tq=4, Q2=FCFS)
+void MLFQ(vector<Process> p){
+    int n=p.size(), tq=4, time=0, done=0; float avgWT=0, avgTAT=0;
+    for(auto &x:p) x.reset();
+    queue<int> q1,q2; vector<bool> inQ1(n,false), inQ2(n,false);
+    while(done<n){
+        for(int i=0;i<n;i++)
+            if(p[i].getAT()<=time && p[i].getRT()>0 && p[i].getQL()==1 && !inQ1[i]){
+                q1.push(i); inQ1[i]=true;
+            }
+        if(!q1.empty()){
+            int idx=q1.front(); q1.pop(); inQ1[idx]=false;
+            int exec=min(tq,p[idx].getRT());
+            time+=exec; p[idx].setRT(p[idx].getRT()-exec);
+            if(p[idx].getRT()>0){ p[idx].setQL(2); q2.push(idx); inQ2[idx]=true; }
+            else{ p[idx].setCT(time); p[idx].setTAT(); p[idx].setWT();
+                  avgWT+=p[idx].getWT(); avgTAT+=p[idx].getTAT(); done++; }
+        }
+        else if(!q2.empty()){
+            int idx=q2.front(); q2.pop(); inQ2[idx]=false;
+            time+=p[idx].getRT(); p[idx].setRT(0);
+            p[idx].setCT(time); p[idx].setTAT(); p[idx].setWT();
+            avgWT+=p[idx].getWT(); avgTAT+=p[idx].getTAT(); done++;
+        }
+        else time++;
+    }
+    cout<<"\nMLFQ Scheduling:\nPID\tAT\tBT\tCT\tTAT\tWT\n";
+    for(auto &x:p) x.display();
+    cout<<"Average WT="<<avgWT/n<<", Average TAT="<<avgTAT/n<<"\n";
+}
+
+// ================= Main =================
+int main(){
+    int n, choice;
+    cout<<"Enter number of processes: ";
+    cin>>n;
+    vector<Process> p;
+    cout<<"Enter Arrival Time and Burst Time:\n";
+    for(int i=0;i<n;i++){
+        int at,bt; cin>>at>>bt;
+        p.push_back(Process(i+1,at,bt));
+    }
+
+    do{
+        cout<<"\nChoose Scheduling Algorithm:\n";
+        cout<<"1. FCFS\n2. SJF (Heap)\n3. Round Robin\n4. Priority (Heap)\n5. MLFQ\n0. Exit\n";
+        cin>>choice;
+
+        if(choice==1) FCFS(p);
+        else if(choice==2) SJF_Heap(p);
+        else if(choice==3){ int tq; cout<<"Enter time quantum: "; cin>>tq; RoundRobin(p,tq);}
+        else if(choice==4){
+            cout<<"Enter Priority for each process:\n";
+            for(int i=0;i<n;i++){ int pr; cin>>pr; p[i]=Process(i+1,p[i].getAT(),p[i].getBT(),pr); }
+            Priority_Heap(p);
+        }
+        else if(choice==5) MLFQ(p);
+
+    }while(choice!=0);
+
+    return 0;
+}
